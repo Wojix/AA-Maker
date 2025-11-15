@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII Painter</title>
+<style>
+  body { margin: 0; display: flex; flex-direction: column; align-items: center; font-family: monospace; }
+  #canvas { border: 1px solid #999; touch-action: none; }
+  #themeBtn { position: absolute; top: 10px; right: 10px; background: none; border: none; padding: 0; cursor: pointer; }
+  #themeBtn img { width: 28.8px; height: 28.8px; transition: filter 0.3s; }
+  .controls { margin: 10px; display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="controls">
+  <input id="bgChars" value=" " maxlength="10">
+  <input id="drawChars" value="@" maxlength="10">
+  <button id="clearBtn">クリア</button>
+</div>
+<canvas id="canvas" width="400" height="400"></canvas>
+<textarea id="output" rows="20" cols="50" readonly></textarea>
+<button id="themeBtn"><img id="themeIcon" src="" alt="theme"></button>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const output = document.getElementById('output');
+const bgInput = document.getElementById('bgChars');
+const drawInput = document.getElementById('drawChars');
+const clearBtn = document.getElementById('clearBtn');
+const themeBtn = document.getElementById('themeBtn');
+const themeIcon = document.getElementById('themeIcon');
+
+let darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+setTheme(darkMode);
+
+function setTheme(isDark) {
+  darkMode = isDark;
+  document.body.style.backgroundColor = isDark ? '#121212' : '#f0f0f0';
+  document.body.style.color = isDark ? '#f0f0f0' : '#121212';
+  clearBtn.style.color = darkMode ? '#f0f0f0' : '#121212';
+  if(darkMode) {
+    themeIcon.src = 'https://iconbox.fun/wp/wp-content/uploads/148_w_24.svg';
+    themeIcon.style.filter = 'invert(100%) brightness(100%)';
+  } else {
+    themeIcon.src = 'https://iconbox.fun/wp/wp-content/uploads/145_w_24.svg';
+    themeIcon.style.filter = 'brightness(70%)';
+  }
+}
+
+themeBtn.addEventListener('click', () => setTheme(!darkMode));
+
+ctx.lineWidth = 2;
+ctx.lineCap = 'round';
+let drawing = false;
+let lastX = 0, lastY = 0;
+
+function startDraw(x, y) { drawing = true; lastX = x; lastY = y; }
+function endDraw() { drawing = false; }
+function draw(x, y) {
+  if(!drawing) return;
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  lastX = x; lastY = y;
+}
+
+canvas.addEventListener('mousedown', e => startDraw(e.offsetX, e.offsetY));
+canvas.addEventListener('mousemove', e => draw(e.offsetX, e.offsetY));
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseout', endDraw);
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; const rect = canvas.getBoundingClientRect(); startDraw(t.clientX - rect.left, t.clientY - rect.top); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); const t = e.touches[0]; const rect = canvas.getBoundingClientRect(); draw(t.clientX - rect.left, t.clientY - rect.top); });
+canvas.addEventListener('touchend', endDraw);
+
+clearBtn.addEventListener('click', () => { ctx.clearRect(0,0,canvas.width,canvas.height); output.value = ''; });
+
+function canvasToASCII() {
+  const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  const data = imageData.data;
+  const w = canvas.width;
+  const h = canvas.height;
+  const bgChars = bgInput.value.length > 0 ? bgInput.value.split('') : [' '];
+  const drawChars = drawInput.value.length > 0 ? drawInput.value.split('') : ['@'];
+  let ascii = '';
+  const stepX = 8; // width per character block
+  const stepY = 16; // height per character block (adjust for font aspect)
+
+  for(let y=0; y<h; y+=stepY){
+    for(let x=0; x<w; x+=stepX){
+      let filled = false;
+      for(let yy=0; yy<stepY; yy++){
+        for(let xx=0; xx<stepX; xx++){
+          const px = x+xx;
+          const py = y+yy;
+          if(px>=w || py>=h) continue;
+          const idx = (py*w + px)*4;
+          if(data[idx+3] > 128){ filled = true; break; }
+        }
+        if(filled) break;
+      }
+      ascii += filled ? drawChars[Math.floor(Math.random()*drawChars.length)] : bgChars[Math.floor(Math.random()*bgChars.length)];
+    }
+    ascii += '\n';
+  }
+  output.value = ascii;
+}
+
+canvas.addEventListener('mouseup', canvasToASCII);
+canvas.addEventListener('touchend', canvasToASCII);
+</script>
+</body>
+</html>
